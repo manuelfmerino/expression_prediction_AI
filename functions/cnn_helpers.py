@@ -149,39 +149,6 @@ def kfold_splits(
                 image_i_norm = pd.DataFrame(image_i_norm).to_csv(
                     dst_path_norm, sep="\t", header=False, index=False
                 )
-
-    #     # Reporting
-    #     # train_counts = np.bincount(labels[train_idx], minlength=len(classes))
-    #     # test_counts  = np.bincount(labels[test_idx],  minlength=len(classes))
-    #     print(f"Fold {fold_idx}:")
-    #     # for cls_idx, cls in enumerate(classes):
-    #     #    print(f"  {cls}: Train {train_counts[cls_idx]}, Test {test_counts[cls_idx]}")
-    #     # use crop_and_rotate_augmentation_training_set for each fold
-    #     tv.crop_and_rotate_augmentation_training_set(
-    #         os.path.join(fold_dir, "train"),
-    #         os.path.join(fold_dir + "_cropped", "train"),
-    #         CROP_PERCENT,
-    #         AUG_PER_IMAGE,
-    #         IMAGE_SIZE,
-    #     )
-    #     # print number of augmented images and number of test images  per each class
-    #     for cls in classes:
-    #         aug_train_dir = os.path.join(fold_dir + "_cropped", "train", cls)
-    #         train_count = len(os.listdir(aug_train_dir))
-    #         test_count = len(os.listdir(os.path.join(fold_dir, "test", cls)))
-    #         print(f"  {cls}: Augmented Train {train_count}, Test {test_count}")
-    #     # crop test set images
-    #     tv.crop_test_set(
-    #         os.path.join(fold_dir, "test"),
-    #         os.path.join(fold_dir + "_cropped", "test"),
-    #         CROP_PERCENT,
-    #     )
-    #     shutil.rmtree(fold_dir)
-    #     shutil.move(
-    #         fold_dir + "_cropped", fold_dir
-    #     )  # rename cropped folder to original fold dir
-    #     return_folder.append(fold_dir)
-    # print(f"\nCreated {n_splits} stratified splits under '{dst_folder}'.")
-    # # return list of fold directories
+    print(f"Created {n_splits} stratified splits under '{dst_folder}'.")
 
     return
