@@ -3,8 +3,10 @@
 # Import packages
 import numpy as np
 import pandas as pd
+import torch.nn as nn
 
 from sklearn.model_selection import StratifiedShuffleSplit, train_test_split
+from torch.utils.data import Dataset
 from PIL import Image
 
 import shutil
@@ -12,9 +14,62 @@ import os
 import random
 import torch
 
+
+# Define classes
+class trace(Dataset):
+    """
+    Dataset class to load .tsv files into tensors for pytorch.
+    Given paths should already define cross-validation (0-4) fold and set (train/validation/test)
+
+    """
+
+    def __init__(self, fold_set_path, transform=None):
+        self.samples = []
+        self.transform = transform
+
+        # Get path and label of all images
+        classes = sorted(
+            [
+                class_i
+                for class_i in os.listdir(fold_set_path)
+                if os.path.isdir(os.path.join(fold_set_path, class_i))
+            ],
+            reverse=True,
+        )
+        class_to_idx = {cls: idx for idx, cls in enumerate(classes)}
+
+        for label in os.listdir(fold_set_path):
+            class_dir = os.path.join(fold_set_path, label)
+            if not os.path.isdir(class_dir):
+                continue
+
+            for fname in os.listdir(class_dir):
+                if fname.endswith(".tsv"):
+                    path = os.path.join(class_dir, fname)
+                    self.samples.append((path, int(class_to_idx[label])))
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, index):
+        path, label = self.samples[index]
+
+        # Load .tsv file
+        trace_arr = np.array(pd.read_csv(path, sep="\t", header=None))
+
+        # Convert to tensor
+        trace_tensor = torch.tensor(trace_arr, dtype=torch.float32)
+
+        # Add channel dimension for CNNs
+        trace_tensor = trace_tensor.unsqueeze(0)  # (1, H, W)
+
+        if self.transform:
+            trace_tensor = self.transform(trace_tensor)
+
+        return trace_tensor, label
+
+
 # Define functions
-
-
 def kfold_splits(
     src_folder, dst_folder, test_size=0.2, val_size=0.25, n_splits=5, seed=42
 ):
@@ -37,8 +92,6 @@ def kfold_splits(
 
     Returns
     -------
-    return_folder:
-        .
 
     """
 
@@ -152,3 +205,100 @@ def kfold_splits(
     print(f"Created {n_splits} stratified splits under '{dst_folder}'.")
 
     return
+
+
+def train_model(n_epochs, train_loader, validation_loader, optimizer, model, criterion):
+    """
+    Trains model for n_epochs epochs.
+
+    Parameters
+    ----------
+    n_epochs: int
+        Number of epochs performed during training.
+    train_loader: torch.utils.data.DataLoader
+        DataLoader containing training set.
+    validation_loader: torch.utils.data.DataLoader
+        DataLoader containing validation set.
+    optimizer: XXXX
+        Optimizer used for gradient descent.
+    model: nn.Module
+        CNN model that will be optimized.
+    criterion: XXXX
+        Metric used for loss quantification.
+
+    Returns
+    -------
+    train_loss: list
+        Training loss.
+    train_acc: list
+        Training loss.
+    val_loss: list
+        Training loss.
+    val_loss: list
+        Training loss.
+
+    """
+    # Variables to store training metrics
+    train_loss = []
+    train_acc = []
+
+    val_loss = []
+    val_acc = []
+
+    for epoch in range(n_epochs):
+
+        # Train using training set
+        model.train()
+
+        running_loss = 0.0
+        correct = 0
+
+        for x, y in train_loader:
+
+            # SEE IF I WANT TO RUN THIS IN THE GPU WITH data.to(DEVICE)
+
+            optimizer.zero_grad()
+
+            y_pred = model(x)
+            loss = criterion(y_pred, y)
+
+            loss.backward()
+            optimizer.step()
+
+            # Calculate running loss for current batch (take into account batch size)
+            running_loss += loss.item() * x.size(0)
+
+            # Calculate accuracy for current batch
+            _, y_pred_cat = torch.max(y_pred, 1)
+            correct += (y_pred_cat == y).sum().item()
+
+        # Calculate loss for entire epoch
+        train_loss.append(running_loss / len(train_loader.dataset))
+        # Calculate accuracy for entire epoch
+        train_acc.append(correct / len(train_loader.dataset))
+
+        # Evaluate using validation set
+        model.eval()
+
+        running_loss = 0.0
+        correct = 0
+
+        with torch.no_grad():  # No need to calculate gradiend descent
+            for x, y in validation_loader:
+                y_pred = model(x)
+                loss = criterion(y_pred, y)
+
+                # Calculate running loss for current batch (take into account batch size)
+                running_loss += loss.item() * x.size(0)
+
+                # Calculate accuracy for current batch
+                _, y_pred_cat = torch.max(y_pred, 1)
+                correct += (y_pred_cat == y).sum().item()
+
+            # Calculate loss for entire epoch
+            val_loss.append(running_loss / len(validation_loader.dataset))
+
+            # Calculate accuracy for entire epoch
+            val_acc.append(correct / len(validation_loader.dataset))
+
+    return train_loss, train_acc, val_loss, val_acc
