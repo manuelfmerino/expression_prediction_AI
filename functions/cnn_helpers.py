@@ -1,14 +1,16 @@
 ### Functions to assist dataset preprocessing and CNN training
 
 # Import packages
-import random
-import torch
 import numpy as np
+import pandas as pd
+
+from sklearn.model_selection import StratifiedShuffleSplit, train_test_split
+from PIL import Image
 
 import shutil
 import os
-
-from sklearn.model_selection import StratifiedShuffleSplit
+import random
+import torch
 
 # Define functions
 
@@ -18,8 +20,7 @@ def kfold_splits(
 ):
     """
     Creates n_splits different splits for k-fold cross-validation.
-    Saves images as .PNG in dst_folder}/fold_i/{train,validation,test}/transcription_state.
-
+    Saves raw and normalized (z-score) images as .PNG in dst_folder}/fold_i/{train,validation,test}/transcription_state.
 
     Parameters
     ----------
@@ -44,7 +45,6 @@ def kfold_splits(
     random.seed(seed)
     np.random.seed(seed)
     shutil.rmtree(dst_folder, ignore_errors=True)
-    os.makedirs(dst_folder, exist_ok=True)
 
     # Get labels and assign indices
     classes = [
@@ -85,19 +85,70 @@ def kfold_splits(
         y_train_val = labels[train_idx]
 
         # Further split into training and validation sets
+        X_train, X_val, y_train, y_val = train_test_split(
+            X_train_val,
+            y_train_val,
+            test_size=val_size,
+            stratify=y_train_val,
+            random_state=42,
+        )
+        print(
+            f"Train size: {len(X_train)}, Validation size: {len(X_val)}, Test size: {len(X_test)}"
+        )
 
-        # print(f"  Train size: {len(train_idx)}, Test size: {len(test_idx)}")
-        # fold_dir = os.path.join(dst_folder, f"fold_{fold_idx}")
-        # for phase, indices in [("train", train_idx), ("test", test_idx)]:
-        #     for cls in classes:
-        #         os.makedirs(os.path.join(fold_dir, phase, cls), exist_ok=True)
-        #     for idx in indices:
-        #         src_path = filepaths[idx]
-        #         cls = classes[labels[idx]]
-        #         dst_path = os.path.join(
-        #             fold_dir, phase, cls, os.path.basename(src_path)
-        #         )
-        #         shutil.copy2(src_path, dst_path)
+        # Read training set to calculate mean and standard deviation for normalization
+        training_images = []
+        for filepath_i in X_train:
+            image_i = np.array(pd.read_csv(filepath_i, sep="\t", header=None))
+            training_images.append(image_i)
+        training_images = np.dstack(training_images)
+
+        mean_train = np.mean(training_images)
+        std_train = np.std(training_images)
+
+        # Save split raw and normalized files
+        fold_dir_raw = os.path.join(dst_folder + "_raw", f"fold_{fold_idx}")
+        os.makedirs(fold_dir_raw, exist_ok=True)
+        fold_dir_norm = os.path.join(dst_folder + "_zscore", f"fold_{fold_idx}")
+        os.makedirs(fold_dir_norm, exist_ok=True)
+
+        for set_i, filepaths_phase_i, labels_phase_i in [
+            ("train", X_train, y_train),
+            ("validation", X_val, y_val),
+            ("test", X_test, y_test),
+        ]:  # Iterate through all three datasets
+            for cls in classes:
+                os.makedirs(os.path.join(fold_dir_raw, set_i, cls), exist_ok=True)
+                os.makedirs(os.path.join(fold_dir_norm, set_i, cls), exist_ok=True)
+            for filepath_i, label_i in zip(
+                filepaths_phase_i, labels_phase_i
+            ):  # Iterate through each image
+                # Open .tsv file
+                image_i = np.array(pd.read_csv(filepath_i, sep="\t", header=None))
+
+                # Raw images - save as .PNG
+                dst_path_raw = os.path.join(
+                    fold_dir_raw,
+                    set_i,
+                    classes[label_i],
+                    os.path.basename(filepath_i.split("/")[-1].split(".")[0] + ".png"),
+                )
+                image_i_raw = image_i / image_i.max() * 255
+                image_i_raw = image_i_raw.astype(np.uint8)
+                Image.fromarray(image_i_raw).save(dst_path_raw)
+
+                # Normalized images - save as .tsv, as .PNG would require clipping negative values
+                dst_path_norm = os.path.join(
+                    fold_dir_norm,
+                    set_i,
+                    classes[label_i],
+                    os.path.basename(filepath_i),
+                )
+
+                image_i_norm = (image_i - mean_train) / std_train
+                image_i_norm = pd.DataFrame(image_i_norm).to_csv(
+                    dst_path_norm, sep="\t", header=False, index=False
+                )
 
     #     # Reporting
     #     # train_counts = np.bincount(labels[train_idx], minlength=len(classes))
@@ -133,4 +184,4 @@ def kfold_splits(
     # print(f"\nCreated {n_splits} stratified splits under '{dst_folder}'.")
     # # return list of fold directories
 
-    return splitter, filepaths, labels
+    return
