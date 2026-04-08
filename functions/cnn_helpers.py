@@ -330,6 +330,9 @@ def train_model(
 
     for epoch in range(n_epochs):
 
+        if (epoch // 50 == 0) and epoch >= 50:
+            print(f"Training epoch {epoch}...")
+
         # Train using training set
         model.train()
 
