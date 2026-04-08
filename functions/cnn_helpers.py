@@ -69,6 +69,82 @@ class trace(Dataset):
         return trace_tensor, label
 
 
+class CNN_1(nn.Module):
+    """
+    Module class to define CNN based on Rajpurkar et al 2021.
+
+    """
+
+    # Contructor
+    def __init__(self, out_1, kernel_cnn_1, out_2, kernel_cnn_2, h, w):
+        super(CNN_1, self).__init__()
+
+        # First Conv2D
+        self.cnn1 = nn.Conv2d(
+            in_channels=1,
+            out_channels=out_1,
+            kernel_size=kernel_cnn_1,
+            stride=1,
+            padding="same",
+        )
+        # First batch normalization
+        self.conv1_bn = nn.BatchNorm2d(out_1)
+        # First pooling
+        self.maxpool1 = nn.MaxPool2d(kernel_size=2)
+
+        # Second Conv2D
+        self.cnn2 = nn.Conv2d(
+            in_channels=out_1,
+            out_channels=out_2,
+            kernel_size=kernel_cnn_2,
+            stride=1,
+            padding="valid",
+        )
+        # Second batch normalization
+        self.conv2_bn = nn.BatchNorm2d(out_2)
+        # Second pooling
+        self.maxpool2 = nn.MaxPool2d(kernel_size=2)
+
+        # Calculate fully connected layer dimensions
+        with torch.no_grad():
+            dummy = torch.zeros(1, 1, h, w)
+            x = self.cnn1(dummy)
+            x = self.conv1_bn(x)
+            x = torch.relu(x)
+            x = self.maxpool1(x)
+
+            x = self.cnn2(x)
+            x = self.conv2_bn(x)
+            x = torch.relu(x)
+            x = self.maxpool2(x)
+
+            flattened_dim = x.view(1, -1).size(1)
+
+        # Fully connected layer - FIX dimensions
+        self.fc1 = nn.Linear(flattened_dim, 1)
+
+    # Prediction
+    def forward(self, x):
+        # First convolutional layer
+        x = self.cnn1(x)
+        x = self.conv1_bn(x)
+        x = torch.relu(x)
+        x = self.maxpool1(x)
+
+        # Second convolutional layer
+        x = self.cnn2(x)
+        x = self.conv2_bn(x)
+        x = torch.relu(x)
+        x = self.maxpool2(x)
+
+        # Fully connected layer with sigmoid activation function
+        x = x.view(x.size(0), -1)
+        x = self.fc1(x)
+        x = torch.sigmoid(x)
+
+        return x
+
+
 # Define functions
 def kfold_splits(
     src_folder, dst_folder, test_size=0.2, val_size=0.25, n_splits=5, seed=42
@@ -269,7 +345,8 @@ def train_model(n_epochs, train_loader, validation_loader, optimizer, model, cri
             running_loss += loss.item() * x.size(0)
 
             # Calculate accuracy for current batch
-            _, y_pred_cat = torch.max(y_pred, 1)
+            # _, y_pred_cat = torch.max(y_pred, 1) # If CrossEntropyLoss()
+            y_pred_cat = (y_pred >= 0.5).long().view(-1)  # If BCELoss(), 0.5 threshold
             correct += (y_pred_cat == y).sum().item()
 
         # Calculate loss for entire epoch
@@ -292,7 +369,10 @@ def train_model(n_epochs, train_loader, validation_loader, optimizer, model, cri
                 running_loss += loss.item() * x.size(0)
 
                 # Calculate accuracy for current batch
-                _, y_pred_cat = torch.max(y_pred, 1)
+                # _, y_pred_cat = torch.max(y_pred, 1) # If CrossEntropyLoss()
+                y_pred_cat = (
+                    (y_pred >= 0.5).long().view(-1)
+                )  # If BCELoss(), 0.5 threshold
                 correct += (y_pred_cat == y).sum().item()
 
             # Calculate loss for entire epoch
