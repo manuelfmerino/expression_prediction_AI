@@ -54,6 +54,9 @@ class trace(Dataset):
     def __getitem__(self, index):
         path, label = self.samples[index]
 
+        # Reshape label
+        label = torch.tensor(label, dtype=torch.float32).unsqueeze(0)
+
         # Load .tsv file
         trace_arr = np.array(pd.read_csv(path, sep="\t", header=None))
 
@@ -283,7 +286,9 @@ def kfold_splits(
     return
 
 
-def train_model(n_epochs, train_loader, validation_loader, optimizer, model, criterion):
+def train_model(
+    n_epochs, train_loader, validation_loader, optimizer, model, criterion, device
+):
     """
     Trains model for n_epochs epochs.
 
@@ -295,12 +300,14 @@ def train_model(n_epochs, train_loader, validation_loader, optimizer, model, cri
         DataLoader containing training set.
     validation_loader: torch.utils.data.DataLoader
         DataLoader containing validation set.
-    optimizer: XXXX
+    optimizer:
         Optimizer used for gradient descent.
     model: nn.Module
         CNN model that will be optimized.
-    criterion: XXXX
+    criterion:
         Metric used for loss quantification.
+    device:
+        GPU specification.
 
     Returns
     -------
@@ -330,8 +337,7 @@ def train_model(n_epochs, train_loader, validation_loader, optimizer, model, cri
         correct = 0
 
         for x, y in train_loader:
-
-            # SEE IF I WANT TO RUN THIS IN THE GPU WITH data.to(DEVICE)
+            x, y = x.to(device), y.to(device)
 
             optimizer.zero_grad()
 
@@ -362,6 +368,7 @@ def train_model(n_epochs, train_loader, validation_loader, optimizer, model, cri
 
         with torch.no_grad():  # No need to calculate gradiend descent
             for x, y in validation_loader:
+                x, y = x.to(device), y.to(device)
                 y_pred = model(x)
                 loss = criterion(y_pred, y)
 
@@ -382,3 +389,47 @@ def train_model(n_epochs, train_loader, validation_loader, optimizer, model, cri
             val_acc.append(correct / len(validation_loader.dataset))
 
     return train_loss, train_acc, val_loss, val_acc
+
+
+def run_predictions(model, test_loader, device):
+    """
+    Calculate predictions on test dataset.
+
+    Parameters
+    ----------
+    model: nn.Module
+        Trained model to run predicions on test set.
+    test_loader: torch.utils.data.DataLoader
+        DataLoader containing test set.
+    device:
+        GPU specification.
+
+    Returns
+    -------
+    y_pred_all: list
+        List of predicions.
+    label_all: list
+        List of true labels.
+
+    """
+
+    y_pred_all = []
+    y_pred_score_all = []
+    label_all = []
+
+    model.eval()
+
+    with torch.no_grad():
+        for imgs, labels in test_loader:
+            imgs = imgs.to(device)
+            y_pred_score = model(imgs)
+            y_pred = y_pred_score >= 0.5
+            y_pred_all.extend(y_pred.long().view(-1).cpu().numpy())
+            y_pred_score_all.extend(y_pred_score.view(-1).cpu().numpy())
+            label_all.extend(labels.long().view(-1).numpy())
+
+    y_pred_all = [int(x) for x in y_pred_all]
+    y_pred_score_all = [float(x) for x in y_pred_score_all]
+    label_all = [int(x) for x in label_all]
+
+    return y_pred_all, y_pred_score_all, label_all
