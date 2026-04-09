@@ -314,7 +314,7 @@ def train_model(
     -------
     train_loss: list
         Training loss.
-    val_loss: list
+    val_loss: lists
         Validation loss.
 
     """
@@ -324,7 +324,7 @@ def train_model(
 
     for epoch in range(n_epochs):
 
-        if (epoch // 25 == 0) and epoch >= 25:
+        if (epoch % 25 == 0) and epoch >= 25:
             print(f"Training epoch {epoch}...")
 
         # Train using training set
@@ -442,7 +442,7 @@ def save_losses(training_loss, validation_loss, path):
 
     ax.legend()
 
-    fig.savefig(path)
+    fig.savefig(path, format="pdf")
     plt.close()
 
 
@@ -511,6 +511,8 @@ def save_roc(fpr, tpr, auc, path):
     ax.set_ylim(0, 1)
     ax.set_xlabel("False Positive Rate")
     ax.set_ylabel("True Positive Rate")
+
+    ax.legend()
 
     fig.savefig(path, format="pdf")
     plt.close()
