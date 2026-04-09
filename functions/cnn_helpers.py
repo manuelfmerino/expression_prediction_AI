@@ -4,6 +4,7 @@
 import numpy as np
 import pandas as pd
 import torch.nn as nn
+import matplotlib.pyplot as plt
 
 from sklearn.model_selection import StratifiedShuffleSplit, train_test_split
 from torch.utils.data import Dataset
@@ -313,24 +314,17 @@ def train_model(
     -------
     train_loss: list
         Training loss.
-    train_acc: list
-        Training loss.
     val_loss: list
-        Training loss.
-    val_loss: list
-        Training loss.
+        Validation loss.
 
     """
     # Variables to store training metrics
     train_loss = []
-    train_acc = []
-
     val_loss = []
-    val_acc = []
 
     for epoch in range(n_epochs):
 
-        if (epoch // 50 == 0) and epoch >= 50:
+        if (epoch // 25 == 0) and epoch >= 25:
             print(f"Training epoch {epoch}...")
 
         # Train using training set
@@ -353,15 +347,8 @@ def train_model(
             # Calculate running loss for current batch (take into account batch size)
             running_loss += loss.item() * x.size(0)
 
-            # Calculate accuracy for current batch
-            # _, y_pred_cat = torch.max(y_pred, 1) # If CrossEntropyLoss()
-            y_pred_cat = (y_pred >= 0.5).long().view(-1)  # If BCELoss(), 0.5 threshold
-            correct += (y_pred_cat == y).sum().item()
-
         # Calculate loss for entire epoch
         train_loss.append(running_loss / len(train_loader.dataset))
-        # Calculate accuracy for entire epoch
-        train_acc.append(correct / len(train_loader.dataset))
 
         # Evaluate using validation set
         model.eval()
@@ -378,20 +365,10 @@ def train_model(
                 # Calculate running loss for current batch (take into account batch size)
                 running_loss += loss.item() * x.size(0)
 
-                # Calculate accuracy for current batch
-                # _, y_pred_cat = torch.max(y_pred, 1) # If CrossEntropyLoss()
-                y_pred_cat = (
-                    (y_pred >= 0.5).long().view(-1)
-                )  # If BCELoss(), 0.5 threshold
-                correct += (y_pred_cat == y).sum().item()
-
             # Calculate loss for entire epoch
             val_loss.append(running_loss / len(validation_loader.dataset))
 
-            # Calculate accuracy for entire epoch
-            val_acc.append(correct / len(validation_loader.dataset))
-
-    return train_loss, train_acc, val_loss, val_acc
+    return train_loss, val_loss
 
 
 def run_predictions(model, test_loader, device):
@@ -436,3 +413,104 @@ def run_predictions(model, test_loader, device):
     label_all = [int(x) for x in label_all]
 
     return y_pred_all, y_pred_score_all, label_all
+
+
+def save_losses(training_loss, validation_loss, path):
+    """
+    Calculate predictions on test dataset.
+
+    Parameters
+    ----------
+    training_loss: list
+        Training losses.
+    validation_loss: list
+        Validation losses.
+    path: str
+        Path to saved image
+
+    Returns
+    -------
+
+    """
+
+    fig, ax = plt.subplots(1, 1)
+    ax.plot(training_loss, label="training loss")
+    ax.plot(validation_loss, label="validation_loss")
+
+    ax.set_xlim(0, len(training_loss))
+    ax.set_ylim(0, np.max([np.max(validation_loss), np.max(training_loss)]))
+
+    ax.legend()
+
+    fig.savefig(path)
+    plt.close()
+
+
+def save_eval_results(path, split, accuracy, report, cm, cm_norm):
+    """
+    Saves test set evaluation data.
+
+    Parameters
+    ----------
+    path: str
+        Path to saved image
+    split: str
+        Current data split
+    accuracy: float
+        Te st accuracy
+    report: str
+        Classification report for test set
+    cm: numpy.ndarray
+        Confusion matrix on test set
+    cm_norm: numpy.ndarray
+        Normalized confusion matrix on test set
+
+    Returns
+    -------
+
+    """
+
+    with open(path, "w") as f:
+        f.write("EVALUATION RESULTS\n\n")
+        f.write(f"Split: {split}\n\n")
+        f.write(f"Test Accuracy: {accuracy:.4f}\n\n")
+        f.write(f"Classification report:\n\n")
+        f.write(report)
+        f.write("\n\nConfusion matrix:\n\n")
+        f.write(f"{cm}\n")
+        f.write("\n\nNormalized confusion matrix:\n\n")
+        f.write(f"{cm_norm}\n")
+
+    f.close()
+
+
+def save_roc(fpr, tpr, auc, path):
+    """
+    Saves the ROC and ROC AUC.
+
+    Parameters
+    ----------
+    fpr: numpy.ndarray
+        False positive rate for each threshold
+    tpr: numpy.ndarray
+        True positive rate for each threshold
+    auc: float
+        Area under the curve for ROC
+    path: str
+        Path to saved image
+
+    Returns
+    -------
+
+    """
+    fig, ax = plt.subplots(1, 1, figsize=(6, 5))
+    ax.plot(fpr, tpr, label=f"AUC = {auc:.4f}")
+    ax.plot([0, 1], [0, 1], linestyle="--")
+
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.set_xlabel("False Positive Rate")
+    ax.set_ylabel("True Positive Rate")
+
+    fig.savefig(path, format="pdf")
+    plt.close()
