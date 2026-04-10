@@ -322,6 +322,9 @@ def train_model(
     train_loss = []
     val_loss = []
 
+    train_acc = []
+    val_acc = []
+
     for epoch in range(n_epochs):
 
         if (epoch % 25 == 0) and epoch >= 25:
@@ -347,8 +350,15 @@ def train_model(
             # Calculate running loss for current batch (take into account batch size)
             running_loss += loss.item() * x.size(0)
 
+            # Calculate training accuracy for current batch
+            y_pred_class = (y_pred >= 0.5).float()
+            correct += (y_pred_class == y).sum().item()
+
         # Calculate loss for entire epoch
         train_loss.append(running_loss / len(train_loader.dataset))
+
+        # Calculate accuracy for entire epoch
+        train_acc.append(correct / len(train_loader.dataset))
 
         # Evaluate using validation set
         model.eval()
@@ -365,10 +375,17 @@ def train_model(
                 # Calculate running loss for current batch (take into account batch size)
                 running_loss += loss.item() * x.size(0)
 
+                # Calculate training accuracy for current batch
+                y_pred_class = (y_pred >= 0.5).float()
+                correct += (y_pred_class == y).sum().item()
+
             # Calculate loss for entire epoch
             val_loss.append(running_loss / len(validation_loader.dataset))
 
-    return train_loss, val_loss
+            # Calculate accuracy for entire epoch
+            val_acc.append(correct / len(validation_loader.dataset))
+
+    return train_loss, val_loss, train_acc, val_acc
 
 
 def run_predictions(model, test_loader, device):
@@ -439,6 +456,37 @@ def save_losses(training_loss, validation_loss, path):
 
     ax.set_xlim(0, len(training_loss))
     ax.set_ylim(0, np.max([np.max(validation_loss), np.max(training_loss)]))
+
+    ax.legend()
+
+    fig.savefig(path, format="pdf")
+    plt.close()
+
+
+def save_accuracies(training_acc, validation_acc, path):
+    """
+    Calculate predictions on test dataset.
+
+    Parameters
+    ----------
+    training_acc: list
+        Training losses.
+    validation_acc: list
+        Validation losses.
+    path: str
+        Path to saved image
+
+    Returns
+    -------
+
+    """
+
+    fig, ax = plt.subplots(1, 1)
+    ax.plot(training_acc, label="training loss")
+    ax.plot(validation_acc, label="validation_loss")
+
+    ax.set_xlim(0, len(training_acc))
+    ax.set_ylim(0, np.max([np.max(validation_acc), np.max(training_acc)]))
 
     ax.legend()
 
