@@ -199,32 +199,34 @@ def kfold_splits(
     filepaths = np.array(filepaths)
     labels = np.array(labels)
 
-    # Generate splits
+    # Generate splits - should always isolate same test set
+    X_train_val, X_test, y_train_val, y_test = train_test_split(
+        filepaths,
+        labels,
+        test_size=test_size,
+        stratify=labels,
+        random_state=seed,
+    )
+
     splitter = StratifiedShuffleSplit(
-        n_splits=n_splits, test_size=test_size, random_state=seed
+        n_splits=n_splits, test_size=val_size, random_state=seed
     )
 
     return_folder = []
 
     # Get test set and an intermediate train one first (contains final training and validation sets)
-    for fold_idx, (train_idx, test_idx) in enumerate(splitter.split(filepaths, labels)):
+    for fold_idx, (train_idx, val_idx) in enumerate(
+        splitter.split(X_train_val, y_train_val)
+    ):
         print(f"Creating fold {fold_idx + 1}/{n_splits}...")
 
         # Get images and labels corresponding to each set
-        X_test = filepaths[test_idx]
-        y_test = labels[test_idx]
+        X_train = filepaths[train_idx]
+        y_train = labels[train_idx]
 
-        X_train_val = filepaths[train_idx]
-        y_train_val = labels[train_idx]
+        X_val = filepaths[val_idx]
+        y_val = labels[val_idx]
 
-        # Further split into training and validation sets
-        X_train, X_val, y_train, y_val = train_test_split(
-            X_train_val,
-            y_train_val,
-            test_size=val_size,
-            stratify=y_train_val,
-            random_state=42,
-        )
         print(
             f"Train size: {len(X_train)}, Validation size: {len(X_val)}, Test size: {len(X_test)}"
         )
