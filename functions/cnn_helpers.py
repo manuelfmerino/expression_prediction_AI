@@ -80,7 +80,7 @@ class CNN_1(nn.Module):
     """
 
     # Contructor
-    def __init__(self, out_1, kernel_cnn_1, out_2, kernel_cnn_2, h, w):
+    def __init__(self, out_1, kernel_cnn_1, out_2, kernel_cnn_2, p, h, w):
         super(CNN_1, self).__init__()
 
         # First Conv2D
@@ -108,6 +108,9 @@ class CNN_1(nn.Module):
         self.conv2_bn = nn.BatchNorm2d(out_2)
         # Second pooling
         self.maxpool2 = nn.MaxPool2d(kernel_size=2)
+
+        # Dropout layer
+        self.dropout = nn.Dropout(p)
 
         # Calculate fully connected layer dimensions
         with torch.no_grad():
@@ -143,6 +146,7 @@ class CNN_1(nn.Module):
 
         # Fully connected layer with sigmoid activation function
         x = x.view(x.size(0), -1)
+        x = self.dropout(x)
         x = self.fc1(x)
         x = torch.sigmoid(x)
 
@@ -484,8 +488,8 @@ def save_accuracies(training_acc, validation_acc, path):
     """
 
     fig, ax = plt.subplots(1, 1)
-    ax.plot(training_acc, label="training loss")
-    ax.plot(validation_acc, label="validation_loss")
+    ax.plot(training_acc, label="training accuracy")
+    ax.plot(validation_acc, label="validation accuracy")
 
     ax.set_xlim(0, len(training_acc))
     ax.set_ylim(0, np.max([np.max(validation_acc), np.max(training_acc)]))
@@ -507,7 +511,7 @@ def save_eval_results(path, split, accuracy, report, cm, cm_norm):
     split: str
         Current data split
     accuracy: float
-        Te st accuracy
+        Test accuracy
     report: str
         Classification report for test set
     cm: numpy.ndarray
