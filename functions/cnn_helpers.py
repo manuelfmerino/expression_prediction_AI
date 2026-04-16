@@ -7,6 +7,7 @@ import torch.nn as nn
 import matplotlib.pyplot as plt
 
 from sklearn.model_selection import StratifiedShuffleSplit, train_test_split
+from sklearn.utils import resample
 from torch.utils.data import Dataset
 from PIL import Image
 
@@ -227,6 +228,21 @@ def kfold_splits(
         # Get images and labels corresponding to each set
         X_train = filepaths[train_idx]
         y_train = labels[train_idx]
+
+        ###############
+        # To achieve a balanced training set:
+        X0 = X_train[y_train == 0]
+        X1 = X_train[y_train == 1]
+
+        # downsample majority class
+        X0_down = resample(X0, replace=False, n_samples=len(X1), random_state=42)
+
+        # combine
+        X_train = np.concatenate([X0_down, X1]).tolist()
+        y_train = np.concatenate(
+            [np.zeros(len(X1), dtype=int), np.ones(len(X1), dtype=int)]
+        ).tolist()
+        ###############
 
         X_val = filepaths[val_idx]
         y_val = labels[val_idx]
