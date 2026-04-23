@@ -128,7 +128,7 @@ class CNN_1(nn.Module):
 
             flattened_dim = x.view(1, -1).size(1)
 
-        # Fully connected layer - FIX dimensions
+        # Fully connected layer
         self.fc1 = nn.Linear(flattened_dim, 1)
 
     # Prediction
