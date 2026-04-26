@@ -1,7 +1,6 @@
 # expression_prediction_AI
 
 ## Description
-
 This repository contains a project to study and predict the transcriptional state of genes based on the three-dimensional structure of chromatin regions encompassing them. The physical information about chromatin is derived from published datasets of chromatin tracing experiments. Specifically, the DNA MERFISH dataset from Su et al. (2020) and the ORCA dataset from Mateo et al. (2019) are analyzed.
 
 ## Notebook description
