@@ -74,6 +74,63 @@ class trace(Dataset):
         return trace_tensor, label
 
 
+# Define classes
+class trace_with_path(Dataset):
+    """
+    Dataset class to load .tsv files into tensors for pytorch.
+    Given paths should already define cross-validation (0-4) fold and set (train/validation/test)
+
+    """
+
+    def __init__(self, fold_set_path, transform=None):
+        self.samples = []
+        self.transform = transform
+
+        # Get path and label of all images
+        classes = sorted(
+            [
+                class_i
+                for class_i in os.listdir(fold_set_path)
+                if os.path.isdir(os.path.join(fold_set_path, class_i))
+            ],
+            reverse=True,
+        )
+        class_to_idx = {cls: idx for idx, cls in enumerate(classes)}
+
+        for label in os.listdir(fold_set_path):
+            class_dir = os.path.join(fold_set_path, label)
+            if not os.path.isdir(class_dir):
+                continue
+
+            for fname in os.listdir(class_dir):
+                if fname.endswith(".tsv"):
+                    path = os.path.join(class_dir, fname)
+                    self.samples.append((path, int(class_to_idx[label])))
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, index):
+        path, label = self.samples[index]
+
+        # Reshape label
+        label = torch.tensor(label, dtype=torch.float32).unsqueeze(0)
+
+        # Load .tsv file
+        trace_arr = np.array(pd.read_csv(path, sep="\t", header=None))
+
+        # Convert to tensor
+        trace_tensor = torch.tensor(trace_arr, dtype=torch.float32)
+
+        # Add channel dimension for CNNs
+        trace_tensor = trace_tensor.unsqueeze(0)  # (1, H, W)
+
+        if self.transform:
+            trace_tensor = self.transform(trace_tensor)
+
+        return trace_tensor, label, path
+
+
 class CNN_1(nn.Module):
     """
     Module class to define CNN based on Rajpurkar et al 2021.
@@ -226,8 +283,9 @@ def kfold_splits(
         print(f"Creating fold {fold_idx + 1}/{n_splits}...")
 
         # Get images and labels corresponding to each set
-        X_train = filepaths[train_idx]
-        y_train = labels[train_idx]
+
+        X_train = X_train_val[train_idx]
+        y_train = y_train_val[train_idx]
 
         ###############
         # To achieve a balanced training set:
@@ -244,8 +302,8 @@ def kfold_splits(
         ).tolist()
         ###############
 
-        X_val = filepaths[val_idx]
-        y_val = labels[val_idx]
+        X_val = X_train_val[val_idx]
+        y_val = y_train_val[val_idx]
 
         print(
             f"Train size: {len(X_train)}, Validation size: {len(X_val)}, Test size: {len(X_test)}"
